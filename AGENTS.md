@@ -85,6 +85,34 @@ custom classes must fully style the input
 - Elixir's builtin OTP primitives like `DynamicSupervisor` and `Registry`, require names in the child spec, such as `{DynamicSupervisor, name: MyApp.MyDynamicSup}`, then you can use `DynamicSupervisor.start_child(MyApp.MyDynamicSup, child_spec)`
 - Use `Task.async_stream(collection, callback, options)` for concurrent enumeration with back-pressure. The majority of times you will want to pass `timeout: :infinity` as option
 
+## QR Code (E-Tiket) via `eqrcode`
+
+- **Gunakan library `eqrcode`** untuk generate QR Code — pure Elixir, hasil SVG langsung, tanpa NIF/deps eksternal
+- Tambahkan `{:eqrcode, "~> 0.1"}` ke `mix.exs`, lalu `mix deps.get`
+- **Generate SVG QR** dari `kode_booking`:
+
+      QRCode.encode(ticket.kode_booking) |> QRCode.svg(width: 200)
+
+- **Display di LiveView:** simpan SVG sebagai assign, render dengan `Phoenix.HTML.raw/1`:
+
+      <div class="flex justify-center">{Phoenix.HTML.raw(@ticket.qr_svg)}</div>
+
+- **Alternatif endpoint gambar:** controller bisa mengembalikan `image/svg+xml` langsung
+- Jangan lupa `import QRCode` di module yang memakainya
+
+## Bioskop.SeatLock (Temporary Seat Locking GenServer)
+
+- Module `Bioskop.SeatLock` di `lib/bioskop/seat_lock.ex` mengelola penguncian kursi sementara di memory
+- Terdaftar dengan nama `Bioskop.SeatLock` di supervision tree
+- **Client API:**
+  - `Bioskop.SeatLock.lock_seat(showtime_id, seat_id)` — Mengunci kursi, memulai timer 5 menit. Return `:ok` atau `{:error, reason}`
+  - `Bioskop.SeatLock.unlock_seat(showtime_id, seat_id)` — Lepas kunci manual
+  - `Bioskop.SeatLock.confirm_booking(showtime_id, seat_id)` — Konfirmasi booking (ubah status ke `:booked`), batalkan timer
+- **Race condition safety:** Semua operasi diproses sequential via message queue GenServer. State di memory dicek sebelum operasi database
+- **Auto-release:** Timer `Process.send_after` selama 5 menit. Jika timer habis dan status masih `:locked`, akan dikembalikan ke `:available`
+- Dalam handler, gunakan `Repo.get` (bukan `get_seat!`) untuk menghindari crash GenServer
+- Jangan panggil `Bioskop.SeatLock.start_link/1` langsung; biarkan supervision tree yang mengelolanya
+
 ## Mix guidelines
 
 - Read the docs and options before using tasks (by using `mix help task_name`)

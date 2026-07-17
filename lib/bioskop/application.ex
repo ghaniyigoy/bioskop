@@ -12,8 +12,7 @@ defmodule Bioskop.Application do
       Bioskop.Repo,
       {DNSCluster, query: Application.get_env(:bioskop, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Bioskop.PubSub},
-      # Start a worker by calling: Bioskop.Worker.start_link(arg)
-      # {Bioskop.Worker, arg},
+      Bioskop.SeatLock,
       # Start to serve requests, typically the last entry
       BioskopWeb.Endpoint
     ]
