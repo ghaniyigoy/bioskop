@@ -18,6 +18,17 @@ defmodule BioskopWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/movies/:id", MovieDetailLive, :show
+    live "/showtime/:id", ShowtimeLive, :show
+    live "/checkout", CheckoutLive, :show
+    live "/booking/:kode_booking", BookingSuccessLive, :show
+  end
+
+  scope "/admin", BioskopWeb.Admin do
+    pipe_through :browser
+
+    live "/movies", MovieLive, :index
+    live "/showtimes", ShowtimeLive, :index
   end
 
   # Other scopes may use custom stacks.

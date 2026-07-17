@@ -1,0 +1,121 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-5xl px-4 py-8">
+    <div class="mb-8">
+      <nav class="breadcrumbs text-sm">
+        <ul>
+          <li><a href="/" class="link link-hover">Beranda</a></li>
+          <li class="text-base-content/60">{@showtime.movie.judul}</li>
+        </ul>
+      </nav>
+      <div class="mt-2">
+        <h1 class="text-2xl font-bold">{@showtime.movie.judul}</h1>
+        <div class="mt-1 flex flex-wrap gap-4 text-sm text-base-content/70">
+          <span class="inline-flex items-center gap-1">
+            <.icon name="hero-clock" class="w-4 h-4" />
+            {@showtime.waktu_mulai |> Calendar.strftime("%d %b %Y, %H:%M")}
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <.icon name="hero-building-storefront" class="w-4 h-4" />
+            Studio {@showtime.nama_studio}
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <.icon name="hero-currency-dollar" class="w-4 h-4" />
+            Rp. {format_price(@showtime.harga_tiket)}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-8">
+      <div class="relative mx-auto max-w-3xl">
+        <div class="h-2 bg-gradient-to-b from-gray-600 to-gray-800 rounded-t-lg"></div>
+        <div class="relative h-20 bg-gradient-to-b from-gray-800 to-gray-950 rounded-b-[100%] flex items-center justify-center overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent">
+          </div>
+          <span class="text-white/40 text-lg font-semibold tracking-[0.4em] uppercase select-none">L A Y A R</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mx-auto max-w-3xl">
+      <div class="flex flex-col items-center gap-3">
+        <%= for {row_letter, row_seats} <- @grouped_seats do %>
+          <div class="flex items-center gap-3">
+            <span class="w-6 text-center text-sm font-semibold text-base-content/60 font-mono">
+              {row_letter}
+            </span>
+            <div class="grid grid-cols-10 gap-1.5 sm:gap-2">
+              <%= for seat <- row_seats do %>
+                <button
+                  id={"seat-#{seat.id}"}
+                  type="button"
+                  phx-click="select_seat"
+                  phx-value-seat-id={seat.id}
+                  class={[
+                    "relative h-7 w-7 sm:h-8 sm:w-8 rounded-lg border-2 text-[10px] sm:text-xs font-bold transition-all duration-150 ease-out flex items-center justify-center",
+                    seat_status_class(seat, @selected_seats, seat.id)
+                  ]}
+                  disabled={
+                    seat.status != :available && !MapSet.member?(@selected_seats, seat.id)
+                  }
+                >
+                  {seat.nomor_kursi |> String.slice(1..-1//1)}
+                </button>
+              <% end %>
+            </div>
+            <span class="w-6 text-center text-sm font-semibold text-base-content/60 font-mono">
+              {row_letter}
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mt-10 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm">
+      <div class="flex items-center gap-2">
+        <span class="inline-block h-4 w-4 rounded border-2 bg-success/15 border-success/30"></span>
+        <span class="text-base-content/70">Tersedia</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-block h-4 w-4 rounded border-2 bg-primary border-primary"></span>
+        <span class="text-base-content/70">Dipilih</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-block h-4 w-4 rounded border-2 bg-warning/20 border-warning/40"></span>
+        <span class="text-base-content/70">Dipesan</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-block h-4 w-4 rounded border-2 bg-error/15 border-error/30 opacity-50"></span>
+        <span class="text-base-content/70">Terjual</span>
+      </div>
+    </div>
+
+    <div class="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+      <div class="text-center sm:text-left">
+        <p class="text-sm text-base-content/60">
+          Kursi dipilih:
+          <span class="font-semibold text-base-content">
+            {MapSet.size(@selected_seats)}
+          </span>
+        </p>
+        <p class="text-sm text-base-content/60">
+          Total:
+          <span class="font-semibold text-lg text-primary">
+            Rp. {format_price(MapSet.size(@selected_seats) * @showtime.harga_tiket)}
+          </span>
+        </p>
+      </div>
+      <button
+        type="button"
+        phx-click="pesan_tiket"
+        class={[
+          "btn btn-primary btn-lg px-8 transition-all duration-200",
+          MapSet.size(@selected_seats) == 0 && "btn-disabled"
+        ]}
+        disabled={MapSet.size(@selected_seats) == 0}
+      >
+        Pesan Tiket
+      </button>
+    </div>
+  </div>
+</Layouts.app>

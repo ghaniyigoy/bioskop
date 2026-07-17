@@ -10,18 +10,47 @@ Sistem pemesanan tiket bioskop real-time berbasis Elixir & Phoenix Framework.
 ## Setup
 
 ```bash
-# Install dependencies
+# Install dependencies & setup database
 mix setup
 
-# Buat database & jalankan migration
-mix ecto.create
-mix ecto.migrate
+# (Opsional) Isi data contoh
+mix run priv/repo/seeds.exs
 
 # Jalankan server
 mix phx.server
 ```
 
 Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
+
+## Routes
+
+| Path | Description |
+|---|---|
+| `GET /` | Halaman utama — katalog film (Now Showing + Coming Soon) |
+| `GET /movies/:id` | Detail film & pilih jadwal tayang |
+| `GET /showtime/:id` | Pilih kursi & pesan tiket |
+| `GET /admin/movies` | **Admin** — Kelola Film (CRUD) |
+| `GET /admin/showtimes` | **Admin** — Kelola Jadwal Tayang |
+
+## Halaman Utama (`/`)
+
+- **Now Showing**: Grid card film dengan poster, rating umur, durasi, genre, dan tombol "Beli Tiket"
+- **Coming Soon**: Grid card dengan efek opacity, menampilkan tanggal rilis
+- **Navbar**: Logo CineReserve, navigasi, search bar, theme toggle
+
+## Detail Film (`/movies/:id`)
+
+- Layout 2 kolom (desktop): kiri poster + info film, kanan pemilihan jadwal
+- **Pilih Tanggal**: Tombol tab horizontal per tanggal tayang
+- **Pilih Lokasi**: Filter berdasarkan bioskop (CGV, XXI, dll)
+- **Jam Tayang**: Daftar showtime yang bisa diklik → navigasi ke halaman pilih kursi
+
+## Pilih Kursi (`/showtime/:id`)
+
+- Peta kursi interaktif dengan status real-time (PubSub)
+- Warna: hijau (tersedia), biru (dipilih), kuning (dipesan/locked), merah (terjual)
+- Ringkasan: jumlah kursi dipilih + total harga
+- 5 menit lock timer via SeatLock GenServer
 
 ## Database Schema
 
@@ -40,6 +69,9 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 | sinopsis | text | |
 | durasi | integer | menit, required |
 | poster_url | string | |
+| rating_umur | string | e.g. "SU", "13+", "17+" |
+| genre | string | e.g. "Aksi, Petualangan" |
+| tanggal_rilis | date | untuk film coming soon |
 
 ### `showtimes`
 | Field | Type | Notes |
@@ -49,6 +81,7 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 | nama_studio | string | required |
 | waktu_mulai | utc_datetime | required |
 | harga_tiket | integer | dalam rupiah, required |
+| lokasi | string | nama bioskop, e.g. "CGV Grand Indonesia" |
 
 ### `seats`
 | Field | Type | Notes |
@@ -85,10 +118,19 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 ## Contexts
 
 | Context | Module | Entity |
-|---|---|---|---|
+|---|---|---|
 | Accounts | `Bioskop.Accounts` | User |
 | Cinema | `Bioskop.Cinema` | Movie, Showtime, Seat |
 | Ticketing | `Bioskop.Ticketing` | Ticket, Transaction |
+
+### Cinema — Fungsi Utama
+
+| Fungsi | Deskripsi |
+|---|---|
+| `list_movies_now_showing/0` | Film yang sedang tayang (punya showtime) |
+| `list_movies_coming_soon/0` | Film dengan `tanggal_rilis` di masa depan |
+| `get_movie_with_showtimes!/1` | Preload film + showtimes |
+| `get_showtime_with_seats!/1` | Preload showtime + kursi + film |
 
 ### SeatLock (In-Memory Locking)
 
@@ -115,3 +157,24 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 3. `SeatLock.confirm_booking/2` dipanggil untuk cleanup timer in-memory
 
 **Alur gagal (`:failure`):** tidak ada perubahan data, return `{:error, :payment_failed}`.
+
+## Seed Data
+
+Jalankan `mix run priv/repo/seeds.exs` untuk mengisi data contoh:
+- 3 user
+- 6 film Now Showing + 3 film Coming Soon
+- Showtimes untuk 3 hari ke depan (5 slot waktu/hari) di 4 lokasi bioskop
+- 80 kursi per showtime (baris A-H, kursi 1-10)
+
+## Admin Panel (`/admin`)
+
+Dashboard admin untuk manajemen data film dan jadwal tayang.
+
+### Kelola Film (`/admin/movies`)
+- Tabel daftar film: Poster mini, Judul, Rating Umur, Durasi, Genre, Aksi (Edit/Delete)
+- Modal form Add/Edit: Judul, Sinopsis, Durasi, Genre, Rating Umur, Tanggal Rilis, Poster (upload file atau URL)
+- Upload poster disimpan di `priv/static/uploads/`
+
+### Kelola Jadwal (`/admin/showtimes`)
+- Tabel jadwal tayang: Film, Studio, Tanggal & Jam, Lokasi, Harga, Aksi (Edit/Delete)
+- Modal form Add/Edit: Dropdown Film, Dropdown Studio (1–5), Tanggal & Jam Tayang, Harga Tiket, Lokasi Bioskop

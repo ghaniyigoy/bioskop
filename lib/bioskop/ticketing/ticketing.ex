@@ -104,6 +104,66 @@ defmodule Bioskop.Ticketing do
     end
   end
 
+  # Booking
+
+  @doc """
+  Membuat booking untuk beberapa kursi sekaligus.
+  Membuat Ticket + Transaction untuk setiap kursi dalam satu Ecto.Multi.
+  """
+  def create_booking(user_id, showtime_id, seat_nomor_list, harga_tiket) do
+    admin_fee = 5_000
+
+    seat_nomor_list
+    |> Enum.with_index()
+    |> Enum.reduce(Multi.new(), fn {nomor_kursi, idx}, multi ->
+      kode_booking = generate_kode_booking(showtime_id, nomor_kursi)
+
+      multi
+      |> Multi.insert(
+        {:ticket, idx},
+        Ticket.changeset(%Ticket{}, %{
+          user_id: user_id,
+          showtime_id: showtime_id,
+          nomor_kursi: nomor_kursi,
+          kode_booking: kode_booking
+        })
+      )
+      |> Multi.run({:transaction, idx}, fn repo, %{{:ticket, ^idx} => ticket} ->
+        %Transaction{}
+        |> Transaction.changeset(%{
+          ticket_id: ticket.id,
+          total_harga: harga_tiket + admin_fee,
+          status_pembayaran: :pending
+        })
+        |> repo.insert()
+      end)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, result} ->
+        tickets =
+          Enum.map(0..(length(seat_nomor_list) - 1), fn idx ->
+            Map.get(result, {:ticket, idx})
+          end)
+
+        transactions =
+          Enum.map(0..(length(seat_nomor_list) - 1), fn idx ->
+            Map.get(result, {:transaction, idx})
+          end)
+
+        {:ok, tickets, transactions}
+
+      {:error, _failed_op, failed_value, _changes_so_far} ->
+        {:error, failed_value}
+    end
+  end
+
+  defp generate_kode_booking(showtime_id, nomor_kursi) do
+    timestamp = System.system_time(:millisecond)
+    random = :rand.uniform(9999)
+    "#{showtime_id}-#{nomor_kursi}-#{timestamp}-#{random}"
+  end
+
   defp do_atomic_checkout(transaction, seat, showtime_id) do
     result =
       Multi.new()
