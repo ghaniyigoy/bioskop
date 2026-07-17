@@ -1,0 +1,146 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-2xl px-4 py-8">
+    <div class="mb-6">
+      <nav class="breadcrumbs text-sm">
+        <ul>
+          <li><a href="/" class="link link-hover">Beranda</a></li>
+          <li class="text-base-content/60">Checkout</li>
+        </ul>
+      </nav>
+    </div>
+
+    <div
+      id="countdown-banner"
+      class="mb-6 rounded-xl border-2 border-warning/30 bg-warning/10 p-4 transition-all duration-300"
+    >
+      <div class="flex items-center gap-3">
+        <.icon name="hero-clock" class="h-6 w-6 text-warning" />
+        <div>
+          <p class="text-sm font-semibold text-warning">Selesaikan pembayaran Anda dalam</p>
+          <p id="countdown-timer" class="text-2xl font-mono font-bold text-warning">05:00</p>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-base-content/50">
+        Kursi akan dilepas dan booking akan dibatalkan jika waktu habis.
+      </p>
+    </div>
+
+    <%= if @showtime do %>
+      <div class="mb-6 rounded-xl border border-base-300 bg-base-100 p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-bold">Ringkasan Tiket</h2>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <.icon name="hero-film" class="h-5 w-5 text-primary" />
+            <div>
+              <p class="font-semibold">{@showtime.movie.judul}</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-4 text-sm text-base-content/70">
+            <span class="inline-flex items-center gap-1">
+              <.icon name="hero-building-storefront" class="h-4 w-4" />
+              Studio {@showtime.nama_studio}
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <.icon name="hero-clock" class="h-4 w-4" />
+              {@showtime.waktu_mulai |> Calendar.strftime("%d %b %Y, %H:%M")}
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <.icon name="hero-map-pin" class="h-4 w-4" />
+              {@showtime.lokasi}
+            </span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <.icon name="hero-ticket" class="h-4 w-4 text-base-content/60" />
+            <span class="text-base-content/60">Kursi:</span>
+            <span class="font-semibold">
+              {@seat_names |> Enum.join(", ")}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6 rounded-xl border border-base-300 bg-base-100 p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-bold">Detail Pembayaran</h2>
+        <div class="space-y-3 divide-y divide-base-200">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-base-content/70">
+              Harga tiket ({length(@tickets)} × Rp. {format_price(@showtime.harga_tiket)})
+            </span>
+            <span class="font-semibold">Rp. {format_price(@total_price)}</span>
+          </div>
+          <div class="flex items-center justify-between pt-3 text-sm">
+            <span class="text-base-content/70">
+              Biaya admin ({length(@tickets)} × Rp. 5.000)
+            </span>
+            <span class="font-semibold">Rp. {format_price(@admin_fee_total)}</span>
+          </div>
+          <div class="flex items-center justify-between pt-3 text-lg">
+            <span class="font-bold">Total</span>
+            <span class="font-bold text-primary">Rp. {format_price(@grand_total)}</span>
+          </div>
+        </div>
+      </div>
+
+      <button
+        id="pay-button"
+        type="button"
+        phx-click="pay"
+        phx-disable-with="Memproses..."
+        class={[
+          "btn btn-primary btn-lg w-full transition-all duration-200",
+          @loading && "btn-disabled loading"
+        ]}
+        disabled={@loading}
+      >
+        Bayar Sekarang — Rp. {format_price(@grand_total)}
+      </button>
+    <% else %>
+      <div class="rounded-xl border border-error/30 bg-error/10 p-8 text-center">
+        <.icon name="hero-exclamation-triangle" class="mx-auto h-12 w-12 text-error" />
+        <p class="mt-3 font-semibold text-error">Data tiket tidak ditemukan</p>
+        <p class="mt-1 text-sm text-base-content/50">
+          Silakan pilih kursi kembali.
+        </p>
+        <a href="/" class="btn btn-outline btn-sm mt-4">Kembali ke Beranda</a>
+      </div>
+    <% end %>
+  </div>
+</Layouts.app>
+
+<script :type={Phoenix.LiveView.ColocatedHook} name=".Countdown">
+  export default {
+    mounted() {
+      this.handleEvent("start_countdown", ({ locked_at, lock_duration_ms }) => {
+        const endTime = locked_at + lock_duration_ms;
+        const banner = document.getElementById("countdown-banner");
+        const timerEl = document.getElementById("countdown-timer");
+
+        const tick = () => {
+          const remaining = Math.max(0, endTime - Date.now());
+          const minutes = String(Math.floor(remaining / 60000)).padStart(2, "0");
+          const seconds = String(Math.floor((remaining % 60000) / 1000)).padStart(2, "0");
+
+          if (timerEl) {
+            timerEl.textContent = `${minutes}:${seconds}`;
+          }
+
+          if (banner) {
+            if (remaining < 60000) {
+              banner.classList.remove("border-warning/30", "bg-warning/10");
+              banner.classList.add("border-error/30", "bg-error/10");
+              if (timerEl) timerEl.classList.add("text-error");
+            }
+          }
+
+          if (remaining <= 0) {
+            this.pushEvent("timer_expired", {});
+          } else {
+            requestAnimationFrame(tick);
+          }
+        };
+
+        tick();
+      });
+    }
+  };
+</script>

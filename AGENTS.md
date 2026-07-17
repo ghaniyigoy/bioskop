@@ -88,17 +88,18 @@ custom classes must fully style the input
 ## QR Code (E-Tiket) via `eqrcode`
 
 - **Gunakan library `eqrcode`** untuk generate QR Code — pure Elixir, hasil SVG langsung, tanpa NIF/deps eksternal
+- Module: `EQRCode` (bukan `QRCode`)
 - Tambahkan `{:eqrcode, "~> 0.1"}` ke `mix.exs`, lalu `mix deps.get`
 - **Generate SVG QR** dari `kode_booking`:
 
-      QRCode.encode(ticket.kode_booking) |> QRCode.svg(width: 200)
+      EQRCode.encode(ticket.kode_booking) |> EQRCode.svg(width: 180)
 
 - **Display di LiveView:** simpan SVG sebagai assign, render dengan `Phoenix.HTML.raw/1`:
 
       <div class="flex justify-center">{Phoenix.HTML.raw(@ticket.qr_svg)}</div>
 
 - **Alternatif endpoint gambar:** controller bisa mengembalikan `image/svg+xml` langsung
-- Jangan lupa `import QRCode` di module yang memakainya
+- Jangan lupa `import EQRCode` di module yang memakainya
 
 ## Bioskop.SeatLock (Temporary Seat Locking GenServer)
 
@@ -108,10 +109,87 @@ custom classes must fully style the input
   - `Bioskop.SeatLock.lock_seat(showtime_id, seat_id)` — Mengunci kursi, memulai timer 5 menit. Return `:ok` atau `{:error, reason}`
   - `Bioskop.SeatLock.unlock_seat(showtime_id, seat_id)` — Lepas kunci manual
   - `Bioskop.SeatLock.confirm_booking(showtime_id, seat_id)` — Konfirmasi booking (ubah status ke `:booked`), batalkan timer
+  - `Bioskop.SeatLock.get_lock_info(showtime_id, seat_id)` — Ambil info lock (`locked_at`, `timer_ref`) untuk countdown timer di checkout
 - **Race condition safety:** Semua operasi diproses sequential via message queue GenServer. State di memory dicek sebelum operasi database
 - **Auto-release:** Timer `Process.send_after` selama 5 menit. Jika timer habis dan status masih `:locked`, akan dikembalikan ke `:available`
 - Dalam handler, gunakan `Repo.get` (bukan `get_seat!`) untuk menghindari crash GenServer
 - Jangan panggil `Bioskop.SeatLock.start_link/1` langsung; biarkan supervision tree yang mengelolanya
+
+## BioskopWeb.ShowtimeLive (Interactive Seat Map)
+
+- Module `BioskopWeb.ShowtimeLive` di `lib/bioskop_web/live/showtime_live.ex`
+- Route: `live "/showtime/:id", ShowtimeLive, :show` — akses via `/showtime/:id`
+- **Context query:** Gunakan `Bioskop.Cinema.get_showtime_with_seats!/1` untuk preload showtime + seats, dan `Bioskop.Cinema.list_seats_by_showtime/1` untuk daftar kursi saja
+- **PubSub topic:** Subscribe ke `"showtime:#{showtime_id}"` — backend broadcast `{:seat_updated, seat}` untuk update real-time
+- **State assigns:**
+  - `@showtime` — struct `Showtime` dengan movie preloaded
+  - `@grouped_seats` — list `{row_letter, [%Seat{}, ...]}` dikelompok per baris (A, B, C...)
+  - `@selected_seats` — `MapSet` berisi `seat_id` yang dipilih user
+- **Event:** `"select_seat"` dengan `phx-value-seat-id={seat.id}` — toggle pilih/batal; hanya available seats bisa dipilih
+- **Status warna kelas** via `seat_status_class/3`:
+  - `:available` → hijau (`bg-success/15 border-success/30`), hover scale
+  - selected → biru (`bg-primary border-primary`), scale-105 + shadow
+  - `:locked` → kuning (`bg-warning/20 border-warning/40 animate-pulse`)
+  - `:booked` → merah (`bg-error/15 border-error/30 opacity-50`)
+- **Template** di `showtime_live/show.html.heex`, pakai `<Layouts.app flash={@flash} current_scope={@current_scope}>`
+- **Layar bioskop:** Gunakan `rounded-b-[100%]` + `bg-gradient-to-b from-gray-800 to-gray-950` untuk efek lengkung
+- **Grid:** `grid grid-cols-10 gap-1.5 sm:gap-2` per baris, label baris di kiri & kanan
+- **Legenda:** 4 indikator warna (Tersedia/Dipilih/Dipesan/Terjual) dengan `flex-wrap`
+- **Harga:** Gunakan `format_price/1` untuk format Rp (thousand separator dots)
+
+## Bioskop.Ticketing.create_booking (Batch Booking)
+
+- Fungsi `Bioskop.Ticketing.create_booking(user_id, showtime_id, seat_nomor_list, harga_tiket)` di `lib/bioskop/ticketing/ticketing.ex`
+- Membuat Ticket + Transaction untuk setiap kursi dalam satu `Ecto.Multi` (atomic)
+- Setiap Ticket mendapat `kode_booking` unik (format: `"{showtime_id}-{nomor_kursi}-{timestamp}-{random}"`)
+- Setiap Transaction dibuat dengan `total_harga = harga_tiket + 5.000` (admin fee) dan `status_pembayaran: :pending`
+- Return `{:ok, tickets, transactions}` atau `{:error, failed_value}`
+
+## BioskopWeb.CheckoutLive (Halaman Checkout + Countdown Timer)
+
+- Module `BioskopWeb.CheckoutLive` di `lib/bioskop_web/live/checkout_live.ex`
+- Route: `live "/checkout", CheckoutLive, :show` — akses via `/checkout?ticket_ids=1,2,3`
+- **Mount:** Load tickets dari DB (preload showtime + transaction + movie), hitung total + admin fee
+- **Countdown timer real-time:**
+  - Server ambil `locked_at` dari `SeatLock.get_lock_info/2`, kirim ke client via `push_event("start_countdown", %{locked_at, lock_duration_ms})`
+  - Client JS Hook `.Countdown` terima event dan hitung mundur setiap detik via `requestAnimationFrame`
+  - Banner berubah warna jadi merah (`border-error/30 bg-error/10`) ketika < 60 detik
+  - Ketika waktu habis, kirim `pushEvent("timer_expired")` ke server
+  - Server pasang `Process.send_after(self(), :expired, 5min)` sebagai safety net
+- **Event `"pay"`:** Loop `process_checkout/2` semua transaksi → redirect ke `/booking/success?ticket_ids=...`
+- **Event `"timer_expired"`:** Unlock seats via SeatLock, update transaction ke `:expired`, redirect ke `/showtime/:id`
+- **State assigns:**
+  - `@tickets` — list Ticket dengan showtime + transaction preloaded
+  - `@showtime` — struct Showtime dengan movie
+  - `@total_price` — harga_tiket × jumlah kursi
+  - `@admin_fee_total` — 5.000 × jumlah kursi
+  - `@grand_total` — total_price + admin_fee_total
+  - `@seat_names` — list nomor kursi (e.g. `["A1", "A2"]`)
+- **Template** di `checkout_live/show.html.heex`, pakai `<Layouts.app flash={@flash} current_scope={@current_scope}>`
+- **Admin fee:** Rp 5.000 per tiket, ditampilkan sebagai biaya admin terpisah
+
+## BioskopWeb.BookingSuccessLive (Halaman Sukses Booking + QR Code)
+
+- Module `BioskopWeb.BookingSuccessLive` di `lib/bioskop_web/live/booking_success_live.ex`
+- Route: `live "/booking/success", BookingSuccessLive, :show` — akses via `/booking/success?ticket_ids=1,2,3`
+- **Tampilkan:**
+  - ✅ Ikon centang hijau + "Pembayaran Berhasil!"
+  - Kode booking (dari ticket pertama) — font monospace besar
+  - QR Code SVG (via `EQRCode.encode/1` + `EQRCode.svg/2`)
+  - Ringkasan tiket: judul film, studio, jam tayang, lokasi, kursi
+  - Daftar per kursi: nomor kursi, kode_booking, status "Lunas", total harga
+  - Tombol **"Kembali ke Beranda"** (`href="/"`)
+- Template di `booking_success_live/show.html.heex`
+
+## BioskopWeb.ShowtimeLive — Event "Pesan Tiket"
+
+- Tambah event `handle_event("pesan_tiket", ...)` di `showtime_live.ex`
+- Flow:
+  1. Lock setiap kursi via `Bioskop.SeatLock.lock_seat(showtime_id, seat_id)`
+  2. Jika semua lock berhasil, panggil `Ticketing.create_booking(1, showtime_id, seat_nomor, harga_tiket)`
+  3. Navigate ke `/checkout?ticket_ids=...` dengan ID tiket yang baru dibuat
+  4. Jika gagal, unlock semua kursi dan tampilkan flash error
+- Tombol "Pesan Tiket" di template punya `phx-click="pesan_tiket"`
 
 ## Mix guidelines
 

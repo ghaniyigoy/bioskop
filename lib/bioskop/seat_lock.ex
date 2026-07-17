@@ -22,6 +22,10 @@ defmodule Bioskop.SeatLock do
     GenServer.call(server, {:confirm_booking, showtime_id, seat_id})
   end
 
+  def get_lock_info(server \\ __MODULE__, showtime_id, seat_id) do
+    GenServer.call(server, {:get_lock_info, showtime_id, seat_id})
+  end
+
   # Server callbacks
 
   @impl true
@@ -121,6 +125,16 @@ defmodule Bioskop.SeatLock do
 
       _ ->
         {:reply, {:error, :not_locked}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:get_lock_info, showtime_id, seat_id}, _from, state) do
+    key = {showtime_id, seat_id}
+
+    case Map.get(state, key) do
+      nil -> {:reply, {:error, :not_locked}, state}
+      info -> {:reply, {:ok, info}, state}
     end
   end
 

@@ -1,0 +1,165 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <nav class="breadcrumbs text-sm mb-6">
+      <ul>
+        <li><a href="/" class="link link-hover">Beranda</a></li>
+        <li class="text-base-content/60">{@movie.judul}</li>
+      </ul>
+    </nav>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      <div class="lg:col-span-4">
+        <div class="sticky top-24">
+          <div class="aspect-[2/3] rounded-2xl overflow-hidden bg-base-200 shadow-lg">
+            <%= if @movie.poster_url do %>
+              <img src={@movie.poster_url} alt={@movie.judul} class="w-full h-full object-cover" />
+            <% else %>
+              <div class="w-full h-full flex items-center justify-center text-base-content/20">
+                <.icon name="hero-film" class="w-20 h-20" />
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-8">
+        <div class="mb-6">
+          <div class="flex flex-wrap items-center gap-3 mb-3">
+            <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">{@movie.judul}</h1>
+            <span class="badge badge-md bg-primary/15 text-primary border-none font-semibold">
+              {@movie.rating_umur || "SU"}
+            </span>
+          </div>
+
+          <div class="flex flex-wrap gap-4 text-sm text-base-content/60 mb-4">
+            <span class="inline-flex items-center gap-1.5">
+              <.icon name="hero-clock" class="w-4 h-4" />
+              {@movie.durasi} menit
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <.icon name="hero-tag" class="w-4 h-4" />
+              {@movie.genre || "General"}
+            </span>
+            <span :if={@movie.tanggal_rilis} class="inline-flex items-center gap-1.5">
+              <.icon name="hero-calendar" class="w-4 h-4" />
+              Rilis: {Calendar.strftime(@movie.tanggal_rilis, "%d %b %Y")}
+            </span>
+          </div>
+
+          <p class="text-base-content/70 leading-relaxed text-sm sm:text-base">
+            {@movie.sinopsis || "Tidak ada sinopsis tersedia."}
+          </p>
+        </div>
+
+        <%= if @movie.showtimes != [] do %>
+          <div class="border-t border-base-200 pt-8">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+              <.icon name="hero-calendar-days" class="w-5 h-5 text-primary" /> Pilih Jadwal Tayang
+            </h2>
+
+            <div class="mb-6">
+              <p class="text-sm font-medium text-base-content/60 mb-3">Tanggal</p>
+              <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <%= for {date, _showtimes} <- @grouped_dates do %>
+                  <button
+                    type="button"
+                    phx-click="select_date"
+                    phx-value-date={Date.to_iso8601(date)}
+                    class={[
+                      "flex-shrink-0 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all duration-200",
+                      if(@selected_date == date,
+                        do: "border-primary bg-primary/10 text-primary shadow-sm",
+                        else:
+                          "border-base-200 bg-base-100 hover:border-base-300 text-base-content/70 hover:text-base-content"
+                      )
+                    ]}
+                  >
+                    {format_date(date)}
+                  </button>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-6">
+              <p class="text-sm font-medium text-base-content/60 mb-3">Lokasi Bioskop</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  phx-click="select_location"
+                  phx-value-location=""
+                  class={[
+                    "px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all duration-200",
+                    if(is_nil(@selected_location),
+                      do: "border-primary bg-primary/10 text-primary shadow-sm",
+                      else:
+                        "border-base-200 bg-base-100 hover:border-base-300 text-base-content/70 hover:text-base-content"
+                    )
+                  ]}
+                >
+                  Semua Lokasi
+                </button>
+                <%= for location <- @unique_locations do %>
+                  <button
+                    type="button"
+                    phx-click="select_location"
+                    phx-value-location={location}
+                    class={[
+                      "px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all duration-200",
+                      if(@selected_location == location,
+                        do: "border-primary bg-primary/10 text-primary shadow-sm",
+                        else:
+                          "border-base-200 bg-base-100 hover:border-base-300 text-base-content/70 hover:text-base-content"
+                      )
+                    ]}
+                  >
+                    {location}
+                  </button>
+                <% end %>
+              </div>
+            </div>
+
+            <div :if={@filtered_showtimes != []} class="space-y-4">
+              <p class="text-sm font-medium text-base-content/60 mb-3">Jam Tayang</p>
+              <%= for showtime <- @filtered_showtimes do %>
+                <.link navigate={~p"/showtime/#{showtime.id}"} class="block">
+                  <div class="flex items-center justify-between p-4 rounded-xl border border-base-200 bg-base-100 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 group cursor-pointer">
+                    <div class="flex items-center gap-4">
+                      <div class="text-center">
+                        <p class="text-xl font-bold text-primary group-hover:scale-105 transition-transform">
+                          {format_time(showtime.waktu_mulai)}
+                        </p>
+                      </div>
+                      <div class="text-sm">
+                        <p class="font-medium text-base-content">{showtime.lokasi}</p>
+                        <p class="text-base-content/50 text-xs">Studio {showtime.nama_studio}</p>
+                      </div>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-lg font-bold text-primary">
+                        Rp {format_price(showtime.harga_tiket)}
+                      </p>
+                      <p class="text-xs text-base-content/40">/kursi</p>
+                    </div>
+                  </div>
+                </.link>
+              <% end %>
+            </div>
+
+            <div
+              :if={@selected_date && @filtered_showtimes == []}
+              class="text-center py-12 text-base-content/40"
+            >
+              <.icon name="hero-clock" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p class="font-medium">Tidak ada jadwal tayang untuk tanggal ini</p>
+            </div>
+
+            <div :if={is_nil(@selected_date)} class="text-center py-12 text-base-content/30">
+              <.icon name="hero-hand-pointer" class="w-12 h-12 mx-auto mb-3" />
+              <p class="font-medium">Pilih tanggal untuk melihat jam tayang</p>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</Layouts.app>

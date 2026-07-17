@@ -1,0 +1,79 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-lg px-4 py-12">
+    <%= if @kode_booking do %>
+      <div class="rounded-2xl border border-success/20 bg-success/5 p-8 text-center shadow-lg">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/20">
+          <.icon name="hero-check" class="h-8 w-8 text-success" />
+        </div>
+        <h1 class="mb-2 text-2xl font-bold text-success">Pembayaran Berhasil!</h1>
+        <p class="mb-6 text-base-content/60">
+          Tiket Anda telah dikonfirmasi. Simpan kode booking berikut:
+        </p>
+
+        <div class="mb-6 rounded-xl border border-base-300 bg-base-100 p-4">
+          <p class="text-xs text-base-content/50 uppercase tracking-wider">Kode Booking</p>
+          <p class="mt-1 text-xl font-mono font-bold tracking-widest text-primary">
+            {@kode_booking}
+          </p>
+        </div>
+
+        <div class="mb-6 flex justify-center">
+          {Phoenix.HTML.raw(@qr_svg)}
+        </div>
+
+        <div class="mb-6 rounded-xl border border-base-300 bg-base-100 p-4 text-left">
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-2">
+              <.icon name="hero-film" class="h-4 w-4 text-primary" />
+              <span class="font-semibold">{@showtime.movie.judul}</span>
+            </div>
+            <div class="flex items-center gap-2 text-base-content/70">
+              <.icon name="hero-building-storefront" class="h-4 w-4" />
+              Studio {@showtime.nama_studio}
+            </div>
+            <div class="flex items-center gap-2 text-base-content/70">
+              <.icon name="hero-clock" class="h-4 w-4" />
+              {@showtime.waktu_mulai |> Calendar.strftime("%d %b %Y, %H:%M")}
+            </div>
+            <div class="flex items-center gap-2 text-base-content/70">
+              <.icon name="hero-map-pin" class="h-4 w-4" />
+              {@showtime.lokasi}
+            </div>
+            <div class="flex items-center gap-2">
+              <.icon name="hero-ticket" class="h-4 w-4 text-primary" />
+              <span class="font-semibold">Kursi: {@seat_names |> Enum.join(", ")}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <%= for ticket <- @tickets do %>
+            <div class="rounded-lg border border-dashed border-base-300 bg-base-200/50 p-3 text-left text-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-base-content/50">Kursi {ticket.nomor_kursi}</span>
+                <span class="font-mono text-xs text-base-content/50">{ticket.kode_booking}</span>
+              </div>
+              <div class="mt-1 flex items-center gap-2">
+                <span class="inline-block h-2 w-2 rounded-full bg-success"></span>
+                <span class="text-xs text-success">Lunas</span>
+                <span class="text-xs text-base-content/40">
+                  Rp. {format_price(ticket.transaction.total_harga)}
+                </span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <a href="/" class="btn btn-primary btn-lg mt-6 w-full">
+          Kembali ke Beranda
+        </a>
+      </div>
+    <% else %>
+      <div class="rounded-xl border border-error/30 bg-error/10 p-8 text-center">
+        <.icon name="hero-exclamation-triangle" class="mx-auto h-12 w-12 text-error" />
+        <p class="mt-3 font-semibold text-error">Data booking tidak ditemukan</p>
+        <a href="/" class="btn btn-outline btn-sm mt-4">Kembali ke Beranda</a>
+      </div>
+    <% end %>
+  </div>
+</Layouts.app>

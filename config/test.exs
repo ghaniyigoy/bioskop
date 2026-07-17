@@ -7,7 +7,7 @@ import Config
 # Run `mix help test` for more information.
 config :bioskop, Bioskop.Repo,
   username: "postgres",
-  password: "Ghaniy",
+  password: "alief2010",
   hostname: "localhost",
   database: "bioskop_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
