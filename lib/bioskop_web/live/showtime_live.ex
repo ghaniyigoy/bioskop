@@ -16,6 +16,7 @@ defmodule BioskopWeb.ShowtimeLive do
 
     socket =
       socket
+      |> assign(:current_scope, nil)
       |> assign(:showtime, showtime)
       |> assign(:showtime_id, showtime_id)
       |> assign(:selected_seats, MapSet.new())

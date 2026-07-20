@@ -181,6 +181,7 @@ defmodule BioskopWeb.MovieDetailLive do
 
     socket =
       socket
+      |> assign(:current_scope, nil)
       |> assign(:movie, movie)
       |> assign(:grouped_dates, grouped_dates)
       |> assign(:unique_locations, unique_locations)

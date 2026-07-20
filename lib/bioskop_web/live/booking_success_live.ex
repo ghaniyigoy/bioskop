@@ -9,6 +9,7 @@ defmodule BioskopWeb.BookingSuccessLive do
   def mount(_params, _session, socket) do
     socket =
       socket
+      |> assign(:current_scope, nil)
       |> assign(:tickets, [])
       |> assign(:showtime, nil)
       |> assign(:seat_names, [])
