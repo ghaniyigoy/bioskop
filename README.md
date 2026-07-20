@@ -28,7 +28,9 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 |---|---|
 | `GET /` | Halaman utama — katalog film (Now Showing + Coming Soon) |
 | `GET /movies/:id` | Detail film & pilih jadwal tayang |
-| `GET /showtime/:id` | Pilih kursi & pesan tiket |
+| `GET /showtime/:id` | Pilih kursi interaktif & pesan tiket |
+| `GET /checkout?ticket_ids=...` | Checkout + countdown timer 5 menit |
+| `GET /booking/success?ticket_ids=...` | Halaman sukses booking + QR Code e-tiket |
 | `GET /admin/movies` | **Admin** — Kelola Film (CRUD) |
 | `GET /admin/showtimes` | **Admin** — Kelola Jadwal Tayang |
 
@@ -44,6 +46,22 @@ Kunjungi [`localhost:4000`](http://localhost:4000) dari browser.
 - **Pilih Tanggal**: Tombol tab horizontal per tanggal tayang
 - **Pilih Lokasi**: Filter berdasarkan bioskop (CGV, XXI, dll)
 - **Jam Tayang**: Daftar showtime yang bisa diklik → navigasi ke halaman pilih kursi
+
+## Checkout (`/checkout?ticket_ids=...`)
+
+- Load data tiket dari DB beserta detail film, studio, jam tayang
+- Countdown timer real-time 5 menit via JS Hook + safety net `Process.send_after`
+- Banner merah ketika < 60 detik
+- Tombol Bayar → proses atomik via `Ecto.Multi` → redirect ke halaman sukses
+- Timer expired → unlock kursi & redirect ke halaman showtime
+
+## Sukses Booking (`/booking/success?ticket_ids=...`)
+
+- Ikon centang hijau + "Pembayaran Berhasil!"
+- Kode booking (monospace besar) + QR Code SVG via `eqrcode`
+- Ringkasan tiket: film, studio, jam tayang, lokasi, kursi
+- Daftar per kursi: nomor kursi, kode_booking, status "Lunas", total harga
+- Tombol "Kembali ke Beranda"
 
 ## Pilih Kursi (`/showtime/:id`)
 

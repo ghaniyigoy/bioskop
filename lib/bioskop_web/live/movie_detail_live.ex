@@ -177,7 +177,7 @@ defmodule BioskopWeb.MovieDetailLive do
     movie_id = String.to_integer(movie_id)
     movie = Cinema.get_movie_with_showtimes!(movie_id)
     grouped_dates = group_showtimes_by_date(movie.showtimes)
-    unique_locations = Enum.uniq_by(movie.showtimes, & &1.lokasi)
+    unique_locations = movie.showtimes |> Enum.map(& &1.lokasi) |> Enum.uniq()
 
     socket =
       socket
