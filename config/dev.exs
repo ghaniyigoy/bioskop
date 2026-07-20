@@ -3,7 +3,7 @@ import Config
 # Configure your database
 config :bioskop, Bioskop.Repo,
   username: "postgres",
-  password: "alief2010",
+  password: "Ghaniy",
   hostname: "localhost",
   database: "bioskop_dev",
   stacktrace: true,
